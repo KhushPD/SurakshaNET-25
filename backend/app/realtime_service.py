@@ -21,9 +21,14 @@ from collections import deque
 import logging
 import threading
 from pathlib import Path
+import sys
 
 from app.ml_service import ml_service
 from network_logger.network_logger import NetworkLogger
+
+# Import IP blocking service
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from blocking.ipblocking import ip_blocking_service
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -508,6 +513,14 @@ class RealTimeMonitoringService:
             model_prediction=attack_type,
             features={"confidence": confidence}
         )
+        
+        # Block IP if high-confidence attack detected
+        if confidence > 0.85:
+            ip_blocking_service.block_ip(
+                ip=source_ip,
+                reason=f"{attack_type} attack detected (confidence: {confidence:.2%})",
+                duration_minutes=30
+            )
     
     async def process_uploaded_data(self, df: pd.DataFrame):
         """

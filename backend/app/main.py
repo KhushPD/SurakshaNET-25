@@ -8,7 +8,7 @@ processes them through ML models, and returns predictions,
 visualizations, and detailed reports.
 """
 
-from fastapi import FastAPI, File, UploadFile, HTTPException, WebSocket
+from fastapi import FastAPI, File, UploadFile, HTTPException, WebSocket, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -42,6 +42,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from network_logger.network_logger import NetworkLogger
 from network_tester.network_tester import NetworkTester, TrafficType
+from blocking.ipblocking import ip_blocking_service
 
 # Setup logging
 logging.basicConfig(
@@ -66,6 +67,22 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# IP Blocking Middleware
+@app.middleware("http")
+async def block_malicious_ips(request: Request, call_next):
+    """Check if IP is blocked before processing request"""
+    client_ip = request.client.host
+    
+    if ip_blocking_service.is_blocked(client_ip):
+        logger.warning(f"Blocked request from: {client_ip}")
+        raise HTTPException(
+            status_code=403,
+            detail=f"Access denied: IP blocked due to suspicious activity"
+        )
+    
+    response = await call_next(request)
+    return response
 
 # Mount reports directory for serving HTML reports
 project_root = Path(__file__).parent.parent.parent
@@ -557,6 +574,29 @@ async def list_reports():
     except Exception as e:
         logger.error(f"Failed to list reports: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to list reports: {str(e)}")
+
+
+# IP Blocking Management Endpoints
+@app.get("/blocked-ips", tags=["Security"])
+async def get_blocked_ips():
+    """Get list of currently blocked IPs"""
+    return {"blocked_ips": ip_blocking_service.get_blocked_ips()}
+
+
+@app.post("/block-ip", tags=["Security"])
+async def block_ip_endpoint(ip: str, reason: str, duration_minutes: int = 60):
+    """Manually block an IP address"""
+    ip_blocking_service.block_ip(ip, reason, duration_minutes)
+    return {"status": "success", "message": f"IP {ip} blocked for {duration_minutes} minutes"}
+
+
+@app.post("/unblock-ip", tags=["Security"])
+async def unblock_ip_endpoint(ip: str):
+    """Manually unblock an IP address"""
+    success = ip_blocking_service.unblock_ip(ip)
+    if success:
+        return {"status": "success", "message": f"IP {ip} unblocked"}
+    return {"status": "error", "message": f"IP {ip} not found in blocked list"}
 
 
 if __name__ == "__main__":
