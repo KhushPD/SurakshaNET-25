@@ -48,6 +48,16 @@ This API accepts network traffic data in CSV format and returns:
 MAX_FILE_SIZE = 100 * 1024 * 1024  # 100 MB
 ALLOWED_EXTENSIONS = {".csv"}
 
+# Processing limits
+MAX_ROWS_FOR_FULL_ANALYSIS = 10000  # Full processing for datasets up to 10K rows
+MAX_ROWS_FOR_VISUALIZATION = 5000   # Generate all visualizations for up to 5K rows
+PREDICTION_BATCH_SIZE = 1000        # Process predictions in batches
+
+# Feature adaptation settings
+ENABLE_FEATURE_ADAPTATION = True    # Allow flexible feature counts
+MIN_FEATURES_REQUIRED = 3           # Minimum features needed for prediction
+FEATURE_ENGINEERING_ENABLED = True  # Enable automatic feature engineering
+
 # Label mappings
 BINARY_LABELS = {0: "Normal", 1: "Attack"}
 MULTICLASS_LABELS = {

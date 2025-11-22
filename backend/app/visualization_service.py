@@ -334,6 +334,34 @@ class VisualizationService:
             logger.error(traceback.format_exc())
         
         return plots
+    
+    def generate_summary_plots(self, predictions: Dict) -> Dict[str, str]:
+        """
+        Generate only essential plots for large datasets (memory efficient).
+        
+        Args:
+            predictions: Prediction results from ML service
+            
+        Returns:
+            Dictionary mapping plot names to base64 images (reduced set)
+        """
+        logger.info("Generating summary plots for large dataset...")
+        
+        plots = {}
+        
+        try:
+            # Only generate lightweight plots
+            plots["pie_chart"] = self.plot_pie_chart(predictions)
+            plots["attack_type_distribution"] = self.plot_attack_type_distribution(predictions)
+            plots["prediction_confidence"] = self.plot_prediction_confidence(predictions)
+            
+            logger.info(f"✅ Generated {len(plots)} summary plots successfully")
+        except Exception as e:
+            logger.error(f"❌ Error generating summary plots: {str(e)}")
+            import traceback
+            logger.error(traceback.format_exc())
+        
+        return plots
 
 
 # Global visualization service instance

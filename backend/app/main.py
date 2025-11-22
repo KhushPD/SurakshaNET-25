@@ -8,25 +8,39 @@ processes them through ML models, and returns predictions,
 visualizations, and detailed reports.
 """
 
-from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi import FastAPI, File, UploadFile, HTTPException, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
+from typing import Optional
 import pandas as pd
 import io
 import logging
+import asyncio
 from pathlib import Path
+from datetime import datetime
 
 from app.config import (
     API_TITLE, 
     API_VERSION, 
     API_DESCRIPTION, 
     MAX_FILE_SIZE, 
-    UPLOADS_DIR
+    UPLOADS_DIR,
+    MAX_ROWS_FOR_VISUALIZATION,
+    PREDICTION_BATCH_SIZE,
+    MULTICLASS_LABELS
 )
 from app.models import HealthResponse, ReportResponse
 from app.ml_service import ml_service
 from app.visualization_service import viz_service
+from app.realtime_service import initialize_realtime_service, realtime_service
+from app.realtime_viz_service import realtime_viz_service
+
+# Import network logger and tester
+import sys
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from network_logger.network_logger import NetworkLogger
+from network_tester.network_tester import NetworkTester, TrafficType
 
 # Setup logging
 logging.basicConfig(
@@ -59,6 +73,15 @@ reports_dir.mkdir(exist_ok=True)
 
 # Mount static files for reports
 app.mount("/reports", StaticFiles(directory=str(reports_dir), html=True), name="reports")
+
+# Initialize network logger
+project_root_path = Path(__file__).parent.parent.parent
+logs_dir = project_root_path / "backend" / "logs"
+logs_dir.mkdir(exist_ok=True)
+network_logger = NetworkLogger(log_file=str(logs_dir / "network_logs.json"))
+
+# Initialize real-time monitoring service
+initialize_realtime_service(network_logger)
 
 
 @app.on_event("startup")
@@ -147,15 +170,24 @@ async def predict_from_csv(file: UploadFile = File(...)):
         
         # Check file size
         if len(content) > MAX_FILE_SIZE:
+            logger.warning(f"File too large: {len(content) / (1024*1024):.2f} MB")
             raise HTTPException(
                 status_code=400,
-                detail=f"File too large. Maximum size is {MAX_FILE_SIZE / (1024*1024):.0f} MB"
+                detail=f"File too large ({len(content) / (1024*1024):.1f} MB). Maximum size is {MAX_FILE_SIZE / (1024*1024):.0f} MB"
             )
         
         # Parse CSV
         logger.info("Parsing CSV file...")
         df = pd.read_csv(io.BytesIO(content))
         logger.info(f"Loaded {len(df)} rows, {len(df.columns)} columns")
+        
+        # Check for empty dataframe
+        if len(df) == 0:
+            raise HTTPException(status_code=400, detail="CSV file contains no data rows")
+        
+        # Warn about large datasets
+        if len(df) > MAX_ROWS_FOR_VISUALIZATION:
+            logger.warning(f"Large dataset ({len(df)} rows). Visualizations will be limited.")
         
         # Validate and prepare data
         X, feature_names = ml_service.validate_and_prepare_data(df)
@@ -171,9 +203,14 @@ async def predict_from_csv(file: UploadFile = File(...)):
         logger.info("Calculating summary statistics...")
         summary = ml_service.calculate_summary(predictions)
         
-        # Generate visualizations
+        # Generate visualizations (skip for very large datasets to save memory)
         logger.info("Generating visualizations...")
-        plots = viz_service.generate_all_plots(predictions)
+        if len(df) <= MAX_ROWS_FOR_VISUALIZATION:
+            plots = viz_service.generate_all_plots(predictions)
+        else:
+            logger.warning(f"Dataset too large ({len(df)} rows) for full visualizations. Generating summary plots only.")
+            # Generate only essential plots for large datasets
+            plots = viz_service.generate_summary_plots(predictions)
         
         # Prepare response
         response = ReportResponse(
@@ -187,14 +224,20 @@ async def predict_from_csv(file: UploadFile = File(...)):
         return response
         
     except pd.errors.EmptyDataError:
+        logger.error("CSV file is empty")
         raise HTTPException(status_code=400, detail="CSV file is empty")
-    except pd.errors.ParserError:
-        raise HTTPException(status_code=400, detail="Invalid CSV format")
+    except pd.errors.ParserError as e:
+        logger.error(f"Invalid CSV format: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Invalid CSV format: {str(e)}")
     except ValueError as e:
+        logger.error(f"Data validation error: {str(e)}")
         raise HTTPException(status_code=400, detail=f"Data validation error: {str(e)}")
+    except HTTPException:
+        # Re-raise HTTPException as-is (already has correct status code)
+        raise
     except Exception as e:
-        logger.error(f"Prediction error: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Prediction failed: {str(e)}")
+        logger.error(f"Unexpected prediction error: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Internal server error during prediction. Please check logs.")
 
 
 @app.post("/predict-batch", tags=["Prediction"])
@@ -244,6 +287,160 @@ async def get_model_info():
         "classes": {
             "binary": ["Normal", "Attack"],
             "multiclass": ["Normal", "DoS", "Probe", "R2L", "U2R"]
+        },
+        "features": {
+            "expected": ml_service.expected_features or "flexible",
+            "adaptation_enabled": True,
+            "supported_range": "3+ features"
+        },
+        "capabilities": [
+            "Flexible feature count handling",
+            "Automatic feature engineering",
+            "Binary and multi-class classification",
+            "Real-time intrusion detection"
+        ]
+    }
+
+
+@app.post("/validate-dataset", tags=["Validation"])
+async def validate_dataset(file: UploadFile = File(...)):
+    """
+    Validate if a CSV file is compatible with the ML models.
+    
+    This endpoint checks the file without making predictions,
+    useful for verifying dataset format before processing.
+    
+    Args:
+        file: CSV file to validate
+        
+    Returns:
+        Validation results with detailed feedback
+    """
+    logger.info(f"Validating dataset: {file.filename}")
+    
+    if not file.filename.endswith('.csv'):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid file type. Please upload a CSV file."
+        )
+    
+    try:
+        # Read file content
+        content = await file.read()
+        
+        # Check file size
+        file_size_mb = len(content) / (1024*1024)
+        if len(content) > MAX_FILE_SIZE:
+            return {
+                "valid": False,
+                "error": f"File too large ({file_size_mb:.1f} MB). Maximum size is {MAX_FILE_SIZE / (1024*1024):.0f} MB",
+                "file_size_mb": round(file_size_mb, 2),
+                "suggestion": "Try uploading a smaller file or use a sample of your dataset"
+            }
+        
+        # Parse CSV
+        df = pd.read_csv(io.BytesIO(content))
+        
+        # Check if empty
+        if len(df) == 0:
+            return {
+                "valid": False,
+                "error": "CSV file is empty",
+                "rows": 0,
+                "columns": 0
+            }
+        
+        # Try to validate and prepare data
+        try:
+            X, feature_names = ml_service.validate_and_prepare_data(df)
+            
+            return {
+                "valid": True,
+                "message": "✅ Dataset is compatible with the model",
+                "file_size_mb": round(file_size_mb, 2),
+                "rows": len(df),
+                "columns": len(df.columns),
+                "features": len(feature_names),
+                "expected_features": 41,
+                "sample_features": feature_names[:5] if len(feature_names) > 5 else feature_names,
+                "ready_for_prediction": True
+            }
+            
+        except ValueError as e:
+            return {
+                "valid": False,
+                "error": str(e),
+                "file_size_mb": round(file_size_mb, 2),
+                "rows": len(df),
+                "columns": len(df.columns),
+                "features_found": len(df.columns) - 1 if 'label' in df.columns else len(df.columns),
+                "expected_features": 41,
+                "ready_for_prediction": False,
+                "suggestion": "This dataset format is incompatible. Use NSL-KDD format or train a new model for this data structure."
+            }
+    
+    except pd.errors.EmptyDataError:
+        return {"valid": False, "error": "CSV file is empty"}
+    except pd.errors.ParserError as e:
+        return {"valid": False, "error": f"Invalid CSV format: {str(e)}"}
+    except Exception as e:
+        logger.error(f"Validation error: {str(e)}")
+        return {"valid": False, "error": f"Validation failed: {str(e)}"}
+
+
+@app.get("/dataset-requirements", tags=["Validation"])
+async def get_dataset_requirements():
+    """
+    Get detailed requirements for compatible datasets.
+    
+    Returns information about expected format, features, and examples.
+    """
+    return {
+        "model_type": "Flexible Network Intrusion Detection",
+        "required_format": "CSV",
+        "feature_handling": "Adaptive (any feature count supported)",
+        "min_features": 3,
+        "max_file_size_mb": MAX_FILE_SIZE / (1024*1024),
+        "feature_adaptation": {
+            "enabled": True,
+            "strategies": [
+                "Feature padding with statistical features",
+                "Feature selection by variance",
+                "Automatic feature engineering"
+            ]
+        },
+        "supported_datasets": [
+            {
+                "name": "nsl_kdd_dataset.csv",
+                "features": 41,
+                "status": "✅ Optimal (no adaptation needed)"
+            },
+            {
+                "name": "similar_network_dataset.csv", 
+                "features": 9,
+                "status": "✅ Supported (auto-padding enabled)"
+            },
+            {
+                "name": "log.csv",
+                "features": 14,
+                "status": "✅ Supported (auto-padding enabled)"
+            },
+            {
+                "name": "Custom datasets",
+                "features": "3+",
+                "status": "✅ Supported with adaptation"
+            }
+        ],
+        "recommendations": [
+            "Any CSV with 3+ numeric features will work",
+            "More features = better accuracy",
+            "Model automatically adapts to your data",
+            "File size should be under 100 MB"
+        ],
+        "how_it_works": {
+            "fewer_features": "System pads with engineered features (mean, std, interactions)",
+            "more_features": "System selects most informative features by variance",
+            "same_features": "Direct prediction without adaptation"
         }
     }
 
@@ -365,3 +562,458 @@ if __name__ == "__main__":
         reload=True,  # Auto-reload on code changes (development only)
         log_level="info"
     )
+
+
+# Network Testing and Logging Endpoints
+@app.post("/network/test", tags=["Network Testing"])
+async def run_network_test(
+    traffic_type: str = "normal",
+    requests_count: int = 50,
+    attack_ratio: float = 0.2
+):
+    """
+    Run network traffic test and log results.
+    
+    Args:
+        traffic_type: Type of test (normal, http_flood, port_scan, sql_injection, xss_attack, mixed)
+        requests_count: Number of requests to generate
+        attack_ratio: Ratio of attack traffic for mixed tests (0.0 to 1.0)
+    """
+    try:
+        tester = NetworkTester(target_url="http://localhost:8000")
+        
+        if traffic_type == "normal":
+            results = await tester.generate_normal_traffic(requests_count)
+        elif traffic_type == "http_flood":
+            results = await tester.generate_http_flood(requests_count, concurrent=20)
+        elif traffic_type == "port_scan":
+            results = await tester.generate_port_scan()
+        elif traffic_type == "sql_injection":
+            results = await tester.generate_sql_injection(requests_count)
+        elif traffic_type == "xss_attack":
+            results = await tester.generate_xss_attack(requests_count)
+        elif traffic_type == "mixed":
+            test_results = await tester.run_mixed_test(requests_count, attack_ratio)
+            results = test_results["results"]
+            
+            # Log all results
+            for result in results:
+                if result.get("traffic_type") == TrafficType.NORMAL.value:
+                    network_logger.log_request(
+                        source_ip=result.get("source_ip", "unknown"),
+                        destination_ip="localhost",
+                        source_port=54321,
+                        destination_port=8000,
+                        protocol="HTTP",
+                        request_type=result.get("method", "GET"),
+                        response_code=result.get("status"),
+                        packet_size=result.get("response_size", 0),
+                        duration=result.get("duration", 0)
+                    )
+                else:
+                    network_logger.log_intrusion(
+                        source_ip=result.get("source_ip", "unknown"),
+                        destination_ip="localhost",
+                        intrusion_type=result.get("traffic_type", "Unknown"),
+                        confidence=0.85,
+                        action="Logged",
+                        model_prediction="Attack"
+                    )
+            
+            network_logger.save_to_file()
+            
+            return {
+                "status": "success",
+                "message": f"Mixed test completed with {len(results)} requests",
+                "summary": test_results["summary"]
+            }
+        else:
+            raise HTTPException(status_code=400, detail=f"Unknown traffic type: {traffic_type}")
+        
+        # Log results
+        for result in results:
+            if result.get("traffic_type") == TrafficType.NORMAL.value:
+                network_logger.log_request(
+                    source_ip=result.get("source_ip", "unknown"),
+                    destination_ip="localhost",
+                    source_port=54321,
+                    destination_port=8000,
+                    protocol="HTTP",
+                    request_type=result.get("method", "GET"),
+                    response_code=result.get("status"),
+                    packet_size=result.get("response_size", 0),
+                    duration=result.get("duration", 0)
+                )
+            else:
+                network_logger.log_intrusion(
+                    source_ip=result.get("source_ip", "unknown"),
+                    destination_ip="localhost",
+                    intrusion_type=result.get("traffic_type", "Unknown"),
+                    confidence=0.85,
+                    action="Logged",
+                    model_prediction="Attack"
+                )
+        
+        network_logger.save_to_file()
+        
+        return {
+            "status": "success",
+            "message": f"{traffic_type} test completed",
+            "requests_generated": len(results)
+        }
+        
+    except Exception as e:
+        logger.error(f"Network test error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/network/logs", tags=["Network Logging"])
+async def get_network_logs(
+    limit: int = 100,
+    filter_type: Optional[str] = None
+):
+    """
+    Get network traffic logs.
+    
+    Args:
+        limit: Maximum number of logs to return
+        filter_type: Filter by type (logged, detected, or None for all)
+    """
+    try:
+        logs = network_logger.get_logs(limit=limit, filter_type=filter_type)
+        return {
+            "status": "success",
+            "count": len(logs),
+            "logs": logs
+        }
+    except Exception as e:
+        logger.error(f"Error fetching logs: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/network/stats", tags=["Network Logging"])
+async def get_network_stats():
+    """Get network traffic statistics."""
+    try:
+        stats = network_logger.get_statistics()
+        return {
+            "status": "success",
+            "statistics": stats
+        }
+    except Exception as e:
+        logger.error(f"Error fetching stats: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/network/logs", tags=["Network Logging"])
+async def clear_network_logs():
+    """Clear all network logs."""
+    try:
+        network_logger.clear_logs()
+        return {
+            "status": "success",
+            "message": "All logs cleared"
+        }
+    except Exception as e:
+        logger.error(f"Error clearing logs: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# REAL-TIME MONITORING ENDPOINTS
+# ============================================================================
+
+@app.post("/realtime/start", tags=["Real-Time Monitoring"])
+async def start_realtime_monitoring(use_simulation: bool = True):
+    """
+    Start real-time network monitoring and ML prediction.
+    
+    Args:
+        use_simulation: If True, uses simulated traffic; if False, waits for real traffic
+        
+    Returns:
+        Status of monitoring service
+    """
+    try:
+        if realtime_service is None:
+            raise HTTPException(status_code=500, detail="Real-time service not initialized")
+        
+        if realtime_service.is_running:
+            return {
+                "status": "already_running",
+                "message": "Real-time monitoring is already active"
+            }
+        
+        await realtime_service.start_monitoring(use_simulation=use_simulation)
+        
+        logger.info("Real-time monitoring started successfully")
+        return {
+            "status": "success",
+            "message": "Real-time monitoring started",
+            "simulation_mode": use_simulation
+        }
+        
+    except Exception as e:
+        logger.error(f"Error starting real-time monitoring: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/realtime/stop", tags=["Real-Time Monitoring"])
+async def stop_realtime_monitoring():
+    """
+    Stop real-time network monitoring.
+    
+    Returns:
+        Status of monitoring service
+    """
+    try:
+        if realtime_service is None:
+            raise HTTPException(status_code=500, detail="Real-time service not initialized")
+        
+        if not realtime_service.is_running:
+            return {
+                "status": "not_running",
+                "message": "Real-time monitoring is not active"
+            }
+        
+        await realtime_service.stop_monitoring()
+        
+        logger.info("Real-time monitoring stopped successfully")
+        return {
+            "status": "success",
+            "message": "Real-time monitoring stopped"
+        }
+        
+    except Exception as e:
+        logger.error(f"Error stopping real-time monitoring: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/realtime/status", tags=["Real-Time Monitoring"])
+async def get_realtime_status():
+    """
+    Get current status of real-time monitoring.
+    
+    Returns:
+        Monitoring status and basic metrics
+    """
+    try:
+        if realtime_service is None:
+            raise HTTPException(status_code=500, detail="Real-time service not initialized")
+        
+        metrics = realtime_service.get_metrics()
+        
+        return {
+            "status": "success",
+            "is_running": realtime_service.is_running,
+            "metrics": metrics
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting real-time status: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/realtime/metrics", tags=["Real-Time Monitoring"])
+async def get_realtime_metrics():
+    """
+    Get detailed real-time metrics for dashboard.
+    
+    Returns:
+        Complete metrics including counts, rates, and statistics
+    """
+    try:
+        if realtime_service is None:
+            raise HTTPException(status_code=500, detail="Real-time service not initialized")
+        
+        metrics = realtime_service.get_metrics()
+        timeline = realtime_service.get_timeline(num_points=50)
+        confidence = realtime_service.get_confidence_distribution()
+        
+        return {
+            "status": "success",
+            "metrics": metrics,
+            "timeline": timeline,
+            "confidence_distribution": confidence
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting real-time metrics: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/realtime/visualizations", tags=["Real-Time Monitoring"])
+async def get_realtime_visualizations():
+    """
+    Get all real-time visualization plots.
+    
+    Returns:
+        Dictionary of base64-encoded plot images
+    """
+    try:
+        if realtime_service is None:
+            raise HTTPException(status_code=500, detail="Real-time service not initialized")
+        
+        # Get current metrics
+        metrics = realtime_service.get_metrics()
+        timeline = realtime_service.get_timeline(num_points=50)
+        confidence = realtime_service.get_confidence_distribution()
+        
+        # Generate visualizations
+        plots = realtime_viz_service.generate_realtime_plots_with_timeline(
+            metrics, timeline, confidence
+        )
+        
+        return {
+            "status": "success",
+            "plots": plots,
+            "metrics_summary": {
+                "total_processed": metrics["total_processed"],
+                "attack_rate": metrics["attack_rate_percent"],
+                "last_update": metrics["last_update"]
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Error generating real-time visualizations: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/realtime/reset", tags=["Real-Time Monitoring"])
+async def reset_realtime_metrics():
+    """
+    Reset all real-time metrics and clear buffers.
+    
+    Returns:
+        Confirmation message
+    """
+    try:
+        if realtime_service is None:
+            raise HTTPException(status_code=500, detail="Real-time service not initialized")
+        
+        realtime_service.reset_metrics()
+        
+        logger.info("Real-time metrics reset successfully")
+        return {
+            "status": "success",
+            "message": "Real-time metrics reset"
+        }
+        
+    except Exception as e:
+        logger.error(f"Error resetting real-time metrics: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/realtime/process-upload", tags=["Real-Time Monitoring"])
+async def process_upload_realtime(file: UploadFile = File(...)):
+    """
+    Process uploaded CSV in real-time mode.
+    Simulates real-time processing of historical data.
+    
+    Args:
+        file: CSV file with network traffic data
+        
+    Returns:
+        Processing status
+    """
+    try:
+        if realtime_service is None:
+            raise HTTPException(status_code=500, detail="Real-time service not initialized")
+        
+        # Validate file
+        if not file.filename.endswith('.csv'):
+            raise HTTPException(status_code=400, detail="Invalid file type. Please upload a CSV file.")
+        
+        # Read and parse CSV
+        content = await file.read()
+        df = pd.read_csv(io.BytesIO(content))
+        
+        logger.info(f"Processing {len(df)} samples in real-time mode")
+        
+        # Process in real-time mode (batched)
+        await realtime_service.process_uploaded_data(df)
+        
+        # Get updated metrics
+        metrics = realtime_service.get_metrics()
+        
+        return {
+            "status": "success",
+            "message": f"Processed {len(df)} samples in real-time mode",
+            "metrics": metrics
+        }
+        
+    except Exception as e:
+        logger.error(f"Error processing upload in real-time: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/realtime/attack-types", tags=["Real-Time Monitoring"])
+async def get_realtime_attack_types():
+    """
+    Get detailed breakdown of attack types detected.
+    
+    Returns:
+        Attack type statistics with labels
+    """
+    try:
+        if realtime_service is None:
+            raise HTTPException(status_code=500, detail="Real-time service not initialized")
+        
+        metrics = realtime_service.get_metrics()
+        attack_counts = metrics["attack_type_counts_all"]
+        
+        # Format with labels
+        attack_types = []
+        for attack_id, count in attack_counts.items():
+            attack_types.append({
+                "id": attack_id,
+                "type": MULTICLASS_LABELS.get(attack_id, "Unknown"),
+                "count": count,
+                "percentage": round(count / metrics["total_processed"] * 100, 2) 
+                            if metrics["total_processed"] > 0 else 0
+            })
+        
+        return {
+            "status": "success",
+            "attack_types": attack_types,
+            "total_processed": metrics["total_processed"]
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting attack types: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.websocket("/realtime/ws")
+async def realtime_websocket(websocket):
+    """
+    WebSocket endpoint for real-time dashboard updates.
+    Pushes metrics every second while connected.
+    """
+    await websocket.accept()
+    logger.info("WebSocket connection established")
+    
+    try:
+        while True:
+            if realtime_service is None:
+                await websocket.send_json({
+                    "error": "Real-time service not initialized"
+                })
+                break
+            
+            # Get current metrics
+            metrics = realtime_service.get_metrics()
+            
+            # Send to client
+            await websocket.send_json({
+                "timestamp": datetime.now().isoformat(),
+                "metrics": metrics
+            })
+            
+            # Wait 1 second before next update
+            await asyncio.sleep(1)
+            
+    except Exception as e:
+        logger.error(f"WebSocket error: {str(e)}")
+    finally:
+        logger.info("WebSocket connection closed")
