@@ -33,7 +33,8 @@ from app.config import (
 from app.models import HealthResponse, ReportResponse
 from app.ml_service import ml_service
 from app.visualization_service import viz_service
-from app.realtime_service import initialize_realtime_service, realtime_service
+from app.realtime_service import initialize_realtime_service
+import app.realtime_service  # Import module to access global later
 from app.realtime_viz_service import realtime_viz_service
 
 # Import network logger and tester
@@ -80,8 +81,9 @@ logs_dir = project_root_path / "backend" / "logs"
 logs_dir.mkdir(exist_ok=True)
 network_logger = NetworkLogger(log_file=str(logs_dir / "network_logs.json"))
 
-# Initialize real-time monitoring service
+# Initialize real-time monitoring service IMMEDIATELY (not in startup event)
 initialize_realtime_service(network_logger)
+logger.info("Real-time monitoring service initialized at module load")
 
 
 @app.on_event("startup")
@@ -90,9 +92,17 @@ async def startup_event():
     Run on application startup.
     Verify models are loaded and system is ready.
     """
+    import app.realtime_service as rt_module
+    
     logger.info("="*70)
     logger.info("Starting SurakshaNET Backend API")
     logger.info("="*70)
+    
+    # Verify real-time service is initialized
+    if rt_module.realtime_service is not None:
+        logger.info("✓ Real-time monitoring service ready")
+    else:
+        logger.error("✗ Real-time service failed to initialize")
     
     if ml_service.models_loaded:
         logger.info("✓ ML models loaded successfully")
@@ -851,13 +861,22 @@ async def get_realtime_visualizations():
         Dictionary of base64-encoded plot images
     """
     try:
-        if realtime_service is None:
+        # Import module to access global variable
+        import app.realtime_service as rt_module
+        rt_service = rt_module.realtime_service
+        
+        if rt_service is None:
+            # Initialize if not done yet
+            initialize_realtime_service(network_logger)
+            rt_service = rt_module.realtime_service
+            
+        if rt_service is None:
             raise HTTPException(status_code=500, detail="Real-time service not initialized")
         
         # Get current metrics
-        metrics = realtime_service.get_metrics()
-        timeline = realtime_service.get_timeline(num_points=50)
-        confidence = realtime_service.get_confidence_distribution()
+        metrics = rt_service.get_metrics()
+        timeline = rt_service.get_timeline(num_points=50)
+        confidence = rt_service.get_confidence_distribution()
         
         # Generate visualizations
         plots = realtime_viz_service.generate_realtime_plots_with_timeline(
@@ -917,7 +936,11 @@ async def process_upload_realtime(file: UploadFile = File(...)):
         Processing status
     """
     try:
-        if realtime_service is None:
+        # Import module to access global variable
+        import app.realtime_service as rt_module
+        rt_service = rt_module.realtime_service
+        
+        if rt_service is None:
             raise HTTPException(status_code=500, detail="Real-time service not initialized")
         
         # Validate file
@@ -931,10 +954,10 @@ async def process_upload_realtime(file: UploadFile = File(...)):
         logger.info(f"Processing {len(df)} samples in real-time mode")
         
         # Process in real-time mode (batched)
-        await realtime_service.process_uploaded_data(df)
+        await rt_service.process_uploaded_data(df)
         
         # Get updated metrics
-        metrics = realtime_service.get_metrics()
+        metrics = rt_service.get_metrics()
         
         return {
             "status": "success",
