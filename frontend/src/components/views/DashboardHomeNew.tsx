@@ -63,6 +63,8 @@ const DashboardHome: React.FC<DashboardHomeProps> = ({ isDarkMode }) => {
     const [error, setError] = useState<string | null>(null);
     const [savedReports, setSavedReports] = useState<SavedReport[]>([]);
     const [showHistory, setShowHistory] = useState(false);
+    const [testLogs, setTestLogs] = useState<any[]>([]);
+    const [isTesting, setIsTesting] = useState(false);
 
     // Load saved reports from localStorage on mount
     useEffect(() => {
@@ -235,6 +237,34 @@ const DashboardHome: React.FC<DashboardHomeProps> = ({ isDarkMode }) => {
         setData(null);
         setFile(null);
         setError(null);
+    };
+
+    const runQuickTest = async () => {
+        setIsTesting(true);
+        setTestLogs([]);
+        try {
+            const response = await fetch('http://localhost:8000/network/test', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    traffic_type: 'mixed',
+                    requests_count: 30,
+                    attack_ratio: 0.4
+                })
+            });
+            const result = await response.json();
+            
+            // Fetch logs after test
+            const logsResponse = await fetch('http://localhost:8000/network/logs?limit=20');
+            const logsData = await logsResponse.json();
+            setTestLogs(logsData.logs || []);
+            
+            alert(`✅ ${result.message}\n${result.summary?.total_requests || 0} requests generated`);
+        } catch (err) {
+            console.error('Test failed:', err);
+            alert('Test failed. Make sure backend is running.');
+        }
+        setIsTesting(false);
     };
 
     const renderStats = () => {
@@ -560,6 +590,78 @@ const DashboardHome: React.FC<DashboardHomeProps> = ({ isDarkMode }) => {
                         }`}>Upload a CSV file to start detection</p>
                 </div>
             )}
+
+            {/* Quick Test Section */}
+            <div className={`mt-6 p-6 rounded-xl border transition-colors ${isDarkMode
+                    ? 'bg-gray-900/60 border-gray-800'
+                    : 'bg-white border-gray-200'
+                }`}>
+                <div className="flex items-center justify-between mb-4">
+                    <div>
+                        <h3 className={`text-lg font-semibold ${isDarkMode ? 'text-gray-200' : 'text-gray-800'
+                            }`}>Quick Network Test</h3>
+                        <p className={`text-sm ${isDarkMode ? 'text-gray-500' : 'text-gray-600'
+                            }`}>Run a mixed traffic test and view recent logs</p>
+                    </div>
+                    <button
+                        onClick={runQuickTest}
+                        disabled={isTesting}
+                        className={`px-6 py-2.5 rounded-lg font-medium transition-colors ${isDarkMode
+                            ? 'bg-blue-600 hover:bg-blue-500 text-white'
+                            : 'bg-blue-700 hover:bg-blue-600 text-white'
+                        } disabled:opacity-50 disabled:cursor-not-allowed`}
+                    >
+                        {isTesting ? 'Testing...' : 'Run Test'}
+                    </button>
+                </div>
+
+                {testLogs.length > 0 && (
+                    <div className={`mt-4 rounded-lg overflow-hidden border ${isDarkMode ? 'border-gray-800' : 'border-gray-200'
+                        }`}>
+                        <div className={`px-4 py-2 text-sm font-semibold ${isDarkMode ? 'bg-gray-800' : 'bg-gray-100'
+                            }`}>Recent Test Logs ({testLogs.length})</div>
+                        <div className="max-h-64 overflow-y-auto">
+                            <table className="w-full text-sm">
+                                <thead className={isDarkMode ? 'bg-gray-900' : 'bg-gray-50'}>
+                                    <tr>
+                                        <th className="px-3 py-2 text-left">Time</th>
+                                        <th className="px-3 py-2 text-left">Source IP</th>
+                                        <th className="px-3 py-2 text-left">Status</th>
+                                        <th className="px-3 py-2 text-left">Type</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {testLogs.map((log) => (
+                                        <tr
+                                            key={log.id}
+                                            className={`border-t ${isDarkMode ? 'border-gray-800' : 'border-gray-200'
+                                            }`}
+                                        >
+                                            <td className="px-3 py-2">
+                                                {new Date(log.timestamp).toLocaleTimeString()}
+                                            </td>
+                                            <td className="px-3 py-2 font-mono text-xs">{log.source_ip}</td>
+                                            <td className="px-3 py-2">
+                                                <span
+                                                    className={`px-2 py-0.5 rounded text-xs font-semibold ${log.status === 'detected'
+                                                        ? 'bg-red-500/20 text-red-500'
+                                                        : 'bg-green-500/20 text-green-500'
+                                                    }`}
+                                                >
+                                                    {log.status}
+                                                </span>
+                                            </td>
+                                            <td className="px-3 py-2 text-xs">
+                                                {log.intrusion_type || log.request_type || '-'}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                )}
+            </div>
         </div>
     );
 };
