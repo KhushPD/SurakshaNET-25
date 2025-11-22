@@ -1,0 +1,457 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ML Model Evaluation Report - SurakshaNET</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 10px;
+            text-align: center;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 2.5em;
+        }
+        .timestamp {
+            font-size: 0.9em;
+            opacity: 0.9;
+            margin-top: 10px;
+        }
+        .section {
+            background: white;
+            padding: 25px;
+            margin-bottom: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h2 {
+            color: #667eea;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 10px;
+            margin-top: 0;
+        }
+        h3 {
+            color: #764ba2;
+            margin-top: 25px;
+        }
+        .metric-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .metric-card {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .metric-card .label {
+            font-size: 0.9em;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .metric-card .value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #667eea;
+            margin-top: 10px;
+        }
+        .plot-container {
+            text-align: center;
+            margin: 30px 0;
+        }
+        .plot-container img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background: #667eea;
+            color: white;
+            font-weight: bold;
+        }
+        tr:hover {
+            background: #f5f5f5;
+        }
+        .good { color: #2ca02c; font-weight: bold; }
+        .medium { color: #ff7f0e; font-weight: bold; }
+        .poor { color: #d62728; font-weight: bold; }
+        .footer {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🛡️ Network Intrusion Detection</h1>
+        <h2>ML Model Evaluation Report</h2>
+        <div class="timestamp">Generated: 2025-11-22 15:47:18</div>
+    </div>
+    
+    <div class="section">
+        <h2>📊 Executive Summary</h2>
+        <p>This report provides a comprehensive evaluation of machine learning models trained for network intrusion detection. 
+        The models were evaluated on NSL-KDD dataset with 886 test samples containing 
+        41 network traffic features.</p>
+        
+        <h3>Models Evaluated:</h3>
+        <ul>
+            <li><strong>Random Forest Binary:</strong> Binary classification (Normal vs Attack)</li>
+            <li><strong>Random Forest Multi-Class:</strong> 5-class classification (Normal, DoS, Probe, R2L, U2R)</li>
+            <li><strong>XGBoost Binary:</strong> Binary classification with gradient boosting</li>
+            <li><strong>XGBoost Multi-Class:</strong> 5-class classification with gradient boosting</li>
+        </ul>
+    </div>
+
+    <div class="section">
+        <h2>📈 RF Binary</h2>
+        
+        <div class="metric-grid">
+            <div class="metric-card">
+                <div class="label">Accuracy</div>
+                <div class="value good">0.8330</div>
+            </div>
+            <div class="metric-card">
+                <div class="label">Precision</div>
+                <div class="value">0.8273</div>
+            </div>
+            <div class="metric-card">
+                <div class="label">Recall</div>
+                <div class="value">1.0000</div>
+            </div>
+            <div class="metric-card">
+                <div class="label">F1-Score</div>
+                <div class="value">0.9055</div>
+            </div>
+        </div>
+        
+        <h3>Classification Report</h3>
+        <table>
+            <tr>
+                <th>Class</th>
+                <th>Precision</th>
+                <th>Recall</th>
+                <th>F1-Score</th>
+                <th>Support</th>
+            </tr>
+
+            <tr>
+                <td>Normal</td>
+                <td>1.0000</td>
+                <td>0.1638</td>
+                <td>0.2816</td>
+                <td>177</td>
+            </tr>
+
+            <tr>
+                <td>Attack</td>
+                <td>0.8273</td>
+                <td>1.0000</td>
+                <td>0.9055</td>
+                <td>709</td>
+            </tr>
+
+        </table>
+
+        <h3>Confusion Matrix</h3>
+        <div class="plot-container">
+            <img src="plots/RF_Binary_confusion_matrix.png" alt="Confusion Matrix">
+        </div>
+
+        <h3>ROC Curve (AUC = 0.9611)</h3>
+        <div class="plot-container">
+            <img src="plots/RF_Binary_roc_curve.png" alt="ROC Curve">
+        </div>
+
+        <h3>Feature Importance (Top 20)</h3>
+        <div class="plot-container">
+            <img src="plots/RF_Binary_feature_importance.png" alt="Feature Importance">
+        </div>
+
+    </div>
+
+    <div class="section">
+        <h2>📈 XGB Binary</h2>
+        
+        <div class="metric-grid">
+            <div class="metric-card">
+                <div class="label">Accuracy</div>
+                <div class="value good">0.9436</div>
+            </div>
+            <div class="metric-card">
+                <div class="label">Precision</div>
+                <div class="value">0.9341</div>
+            </div>
+            <div class="metric-card">
+                <div class="label">Recall</div>
+                <div class="value">1.0000</div>
+            </div>
+            <div class="metric-card">
+                <div class="label">F1-Score</div>
+                <div class="value">0.9659</div>
+            </div>
+        </div>
+        
+        <h3>Classification Report</h3>
+        <table>
+            <tr>
+                <th>Class</th>
+                <th>Precision</th>
+                <th>Recall</th>
+                <th>F1-Score</th>
+                <th>Support</th>
+            </tr>
+
+            <tr>
+                <td>Normal</td>
+                <td>1.0000</td>
+                <td>0.7175</td>
+                <td>0.8355</td>
+                <td>177</td>
+            </tr>
+
+            <tr>
+                <td>Attack</td>
+                <td>0.9341</td>
+                <td>1.0000</td>
+                <td>0.9659</td>
+                <td>709</td>
+            </tr>
+
+        </table>
+
+        <h3>Confusion Matrix</h3>
+        <div class="plot-container">
+            <img src="plots/XGB_Binary_confusion_matrix.png" alt="Confusion Matrix">
+        </div>
+
+        <h3>ROC Curve (AUC = 0.9534)</h3>
+        <div class="plot-container">
+            <img src="plots/XGB_Binary_roc_curve.png" alt="ROC Curve">
+        </div>
+
+        <h3>Feature Importance (Top 20)</h3>
+        <div class="plot-container">
+            <img src="plots/XGB_Binary_feature_importance.png" alt="Feature Importance">
+        </div>
+
+    </div>
+
+    <div class="section">
+        <h2>📈 RF MultiClass</h2>
+        
+        <div class="metric-grid">
+            <div class="metric-card">
+                <div class="label">Accuracy</div>
+                <div class="value poor">0.1975</div>
+            </div>
+            <div class="metric-card">
+                <div class="label">Precision</div>
+                <div class="value">0.1986</div>
+            </div>
+            <div class="metric-card">
+                <div class="label">Recall</div>
+                <div class="value">0.1975</div>
+            </div>
+            <div class="metric-card">
+                <div class="label">F1-Score</div>
+                <div class="value">0.1969</div>
+            </div>
+        </div>
+        
+        <h3>Classification Report</h3>
+        <table>
+            <tr>
+                <th>Class</th>
+                <th>Precision</th>
+                <th>Recall</th>
+                <th>F1-Score</th>
+                <th>Support</th>
+            </tr>
+
+            <tr>
+                <td>Normal</td>
+                <td>0.1889</td>
+                <td>0.1921</td>
+                <td>0.1905</td>
+                <td>177</td>
+            </tr>
+
+            <tr>
+                <td>DoS</td>
+                <td>0.2303</td>
+                <td>0.1979</td>
+                <td>0.2129</td>
+                <td>192</td>
+            </tr>
+
+            <tr>
+                <td>Probe</td>
+                <td>0.2081</td>
+                <td>0.2680</td>
+                <td>0.2343</td>
+                <td>153</td>
+            </tr>
+
+            <tr>
+                <td>R2L</td>
+                <td>0.2065</td>
+                <td>0.1758</td>
+                <td>0.1899</td>
+                <td>182</td>
+            </tr>
+
+            <tr>
+                <td>U2R</td>
+                <td>0.1587</td>
+                <td>0.1648</td>
+                <td>0.1617</td>
+                <td>182</td>
+            </tr>
+
+        </table>
+
+        <h3>Confusion Matrix</h3>
+        <div class="plot-container">
+            <img src="plots/RF_MultiClass_confusion_matrix.png" alt="Confusion Matrix">
+        </div>
+
+        <h3>Feature Importance (Top 20)</h3>
+        <div class="plot-container">
+            <img src="plots/RF_MultiClass_feature_importance.png" alt="Feature Importance">
+        </div>
+
+    </div>
+
+    <div class="section">
+        <h2>📈 XGB MultiClass</h2>
+        
+        <div class="metric-grid">
+            <div class="metric-card">
+                <div class="label">Accuracy</div>
+                <div class="value poor">0.1998</div>
+            </div>
+            <div class="metric-card">
+                <div class="label">Precision</div>
+                <div class="value">0.1990</div>
+            </div>
+            <div class="metric-card">
+                <div class="label">Recall</div>
+                <div class="value">0.1998</div>
+            </div>
+            <div class="metric-card">
+                <div class="label">F1-Score</div>
+                <div class="value">0.1982</div>
+            </div>
+        </div>
+        
+        <h3>Classification Report</h3>
+        <table>
+            <tr>
+                <th>Class</th>
+                <th>Precision</th>
+                <th>Recall</th>
+                <th>F1-Score</th>
+                <th>Support</th>
+            </tr>
+
+            <tr>
+                <td>Normal</td>
+                <td>0.1823</td>
+                <td>0.1864</td>
+                <td>0.1844</td>
+                <td>177</td>
+            </tr>
+
+            <tr>
+                <td>DoS</td>
+                <td>0.2195</td>
+                <td>0.1875</td>
+                <td>0.2022</td>
+                <td>192</td>
+            </tr>
+
+            <tr>
+                <td>Probe</td>
+                <td>0.2183</td>
+                <td>0.2810</td>
+                <td>0.2457</td>
+                <td>153</td>
+            </tr>
+
+            <tr>
+                <td>R2L</td>
+                <td>0.1806</td>
+                <td>0.1538</td>
+                <td>0.1662</td>
+                <td>182</td>
+            </tr>
+
+            <tr>
+                <td>U2R</td>
+                <td>0.1958</td>
+                <td>0.2033</td>
+                <td>0.1995</td>
+                <td>182</td>
+            </tr>
+
+        </table>
+
+        <h3>Confusion Matrix</h3>
+        <div class="plot-container">
+            <img src="plots/XGB_MultiClass_confusion_matrix.png" alt="Confusion Matrix">
+        </div>
+
+        <h3>Feature Importance (Top 20)</h3>
+        <div class="plot-container">
+            <img src="plots/XGB_MultiClass_feature_importance.png" alt="Feature Importance">
+        </div>
+
+    </div>
+
+    <div class="section">
+        <h2>📊 Model Comparison</h2>
+        <div class="plot-container">
+            <img src="plots/model_comparison.png" alt="Model Comparison">
+        </div>
+    </div>
+
+    <div class="footer">
+        <p>🛡️ SurakshaNET - Network Intrusion Detection System</p>
+        <p>Report generated automatically by ML Model Evaluation Pipeline</p>
+    </div>
+</body>
+</html>

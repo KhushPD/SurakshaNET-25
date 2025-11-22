@@ -1,0 +1,88 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+ENV/
+env/
+.venv
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+logs/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# ML Models (if you want to exclude large model files)
+# Uncomment if models are too large for git
+# *.joblib
+# *.pkl
+# *.h5
+# *.pt
+
+# Uploads directory (user uploaded files)
+uploads/*
+!uploads/.gitkeep
+
+# Datasets (large CSV files)
+dataset/
+*.csv
+
+# Reports (generated reports can be regenerated)
+# Uncomment if you don't want to track reports
+# reports/*.html
+# reports/plots/*.png
+
+# Temporary files
+*.tmp
+*.bak
+temp/
+tmp/
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# OS specific
+Thumbs.db
+.DS_Store

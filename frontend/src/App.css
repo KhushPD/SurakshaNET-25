@@ -1,0 +1,11 @@
+/* Dark cybersecurity theme */
+body {
+    background: linear-gradient(to bottom right, #000000, #111827, #064e3b);
+    min-height: 100vh;
+    margin: 0;
+    padding: 0;
+}
+
+#root {
+    min-height: 100vh;
+}

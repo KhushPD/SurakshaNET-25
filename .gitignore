@@ -1,0 +1,4 @@
+# Datasets (large CSV files)
+dataset/
+*.csv
+*.parquet
