@@ -7,6 +7,7 @@
 
 import './App.css';
 import { useState, useEffect } from 'react';
+import LandingPage from './components/views/LandingPage';
 import LoginView from './components/auth/LoginView';
 import Navbar from './components/layout/Navbar';
 import DashboardHome from './components/views/DashboardHomeNew';
@@ -15,6 +16,9 @@ import ThreatIntelView from './components/views/ThreatIntelView';
 import ReportsView from './components/views/ReportsView';
 
 function App() {
+  // Landing page state
+  const [showLanding, setShowLanding] = useState<boolean>(true);
+
   // Authentication state
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const [username, setUsername] = useState<string>('');
@@ -50,6 +54,11 @@ function App() {
     setIsDarkMode(!isDarkMode);
   };
 
+  // Handle "Get Started" button click
+  const handleGetStarted = () => {
+    setShowLanding(false);
+  };
+
   // Handle user login
   const handleLogin = (user: string, pass: string) => {
     if (user && pass) {
@@ -67,6 +76,7 @@ function App() {
     setIsLoggedIn(false);
     setUsername('');
     setActiveTab('dashboard');
+    setShowLanding(true); // Return to landing page
   };
 
   // Render appropriate view based on active tab
@@ -85,6 +95,11 @@ function App() {
     }
   };
 
+  // Show landing page first
+  if (showLanding && !isLoggedIn) {
+    return <LandingPage onGetStarted={handleGetStarted} isDarkMode={isDarkMode} toggleTheme={toggleTheme} />;
+  }
+
   // Show login page if not authenticated
   if (!isLoggedIn) {
     return <LoginView onLogin={handleLogin} isDarkMode={isDarkMode} toggleTheme={toggleTheme} />;
@@ -93,8 +108,8 @@ function App() {
   // Show main dashboard if authenticated
   return (
     <div className={`flex flex-col h-screen font-sans overflow-hidden transition-colors duration-300 ${isDarkMode
-        ? 'bg-gradient-to-br from-black via-gray-900 to-green-950 text-gray-200'
-        : 'bg-gradient-to-br from-gray-50 via-white to-green-50 text-gray-800'
+      ? 'bg-gradient-to-br from-black via-gray-900 to-green-950 text-gray-200'
+      : 'bg-gradient-to-br from-gray-50 via-white to-green-50 text-gray-800'
       }`}>
       <Navbar
         activeTab={activeTab}
