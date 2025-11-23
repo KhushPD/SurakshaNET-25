@@ -131,21 +131,24 @@ Continue monitoring for any anomalies.
         return response
     
     def chat(self, message: str, context: Optional[Dict] = None) -> str:
-        """Process chat message with optional context"""
+        """Process chat message with optional context - AI first, fallback only on failure"""
         
         # If context provided (log data), analyze it with AI
         if context and context.get('log_data'):
             return self._analyze_log_with_ai(context['log_data'], message)
         
-        # Use Groq AI if available
+        # ALWAYS try Groq AI first if available
         if self.use_groq and self.groq_client:
-            return self._chat_with_groq(message)
+            ai_response = self._chat_with_groq(message)
+            # Only fallback if AI explicitly failed (returns None or error message)
+            if ai_response and not ai_response.startswith("⚠️ AI Error"):
+                return ai_response
         
-        # Fallback to pattern-based responses
+        # Fallback to pattern-based responses only if AI failed
         return self._fallback_response(message)
     
     def _chat_with_groq(self, message: str) -> str:
-        """Chat using Groq AI"""
+        """Chat using Groq AI - returns AI response or error indicator"""
         try:
             # Add user message to history
             self.conversation_history.append({
@@ -164,14 +167,21 @@ Continue monitoring for any anomalies.
             
             # Call Groq API
             response = self.groq_client.chat.completions.create(
-                model="llama-3.1-70b-versatile",  # Fast and capable model
+                model="qwen/qwen3-32b",  # Fast and capable model
                 messages=messages,
                 temperature=0.7,
-                max_tokens=1000,
-                top_p=0.9
+                max_tokens=1500,
+                top_p=0.9,
+                stream=False
             )
             
+            # Extract content and remove thinking tags if present
             assistant_message = response.choices[0].message.content
+            
+            # Remove <think>...</think> tags and their content
+            import re
+            assistant_message = re.sub(r'<think>.*?</think>', '', assistant_message, flags=re.DOTALL)
+            assistant_message = assistant_message.strip()
             
             # Add assistant response to history
             self.conversation_history.append({
@@ -179,29 +189,70 @@ Continue monitoring for any anomalies.
                 "content": assistant_message
             })
             
+            logger.info("✓ Groq AI response generated successfully")
             return assistant_message
             
         except Exception as e:
-            logger.error(f"Groq API error: {e}")
-            return self._fallback_response(message)
+            logger.error(f"❌ Groq API error: {e}")
+            # Return error indicator so fallback can be used
+            return f"⚠️ AI Error: {str(e)}"
     
     def _analyze_log_with_ai(self, log_data: Dict, user_message: str) -> str:
-        """Analyze log with AI or fallback"""
+        """Analyze log with AI - prioritize AI response, fallback only on failure"""
         
-        # Build log analysis prompt
-        log_info = f"""Analyze this network log entry:
+        # Add XAI explanation if available
+        xai_section = ""
+        try:
+            from reporting.blockchain_service import xai_explainer
+            if xai_explainer and 'features' in log_data:
+                features = log_data.get('features', [])
+                if features:
+                    xai_text = xai_explainer.get_explanation_text(features)
+                    xai_section = f"\n\n{xai_text}\n"
+        except Exception as e:
+            logger.debug(f"XAI explanation not available: {e}")
+        
+        # Add blockchain verification
+        blockchain_section = ""
+        try:
+            from reporting.blockchain_service import threat_blockchain
+            block = threat_blockchain.get_block_by_ip(log_data.get('source_ip'))
+            if block:
+                blockchain_section = f"""
 
-Source IP: {log_data.get('source_ip', 'Unknown')}
-Destination IP: {log_data.get('destination_ip', 'Unknown')}
-Status: {log_data.get('status', 'Unknown')}
-Type: {log_data.get('intrusion_type') or log_data.get('request_type', 'Unknown')}
-Confidence: {log_data.get('confidence', 0) * 100:.1f}%
+## 🔗 Blockchain Verification
 
-Provide:
-1. Threat assessment
-2. Recommended actions
-3. Risk level"""
+**Block Hash:** `{block['current_hash'][:32]}...`
+**Block Index:** #{block['index']}
+**Timestamp:** {block['timestamp']}
+**Previous Hash:** `{block['previous_hash'][:16]}...`
 
+✅ This threat record is stored in our immutable blockchain audit trail.
+"""
+        except Exception as e:
+            logger.debug(f"Blockchain info not available: {e}")
+        
+        # Build comprehensive log analysis prompt
+        log_info = f"""Analyze this network log entry in detail:
+
+**Log Details:**
+- Source IP: {log_data.get('source_ip', 'Unknown')}
+- Destination IP: {log_data.get('destination_ip', 'Unknown')}
+- Status: {log_data.get('status', 'Unknown')}
+- Attack Type: {log_data.get('intrusion_type') or log_data.get('request_type', 'Unknown')}
+- Detection Confidence: {log_data.get('confidence', 0) * 100:.1f}%
+- Timestamp: {log_data.get('timestamp', 'Unknown')}
+
+**Provide a comprehensive analysis with:**
+1. **Threat Assessment** - What type of attack is this and how serious is it?
+2. **Technical Analysis** - Explain the attack pattern and what the attacker is trying to do
+3. **Recommended Actions** - Specific steps to take (blocking, monitoring, investigation)
+4. **Risk Level** - Critical/High/Medium/Low and why
+5. **Prevention** - How to prevent similar attacks in the future
+
+Format your response with clear markdown sections (##) and bullet points."""
+
+        # ALWAYS try AI first
         if self.use_groq and self.groq_client:
             try:
                 response = self.groq_client.chat.completions.create(
@@ -211,14 +262,28 @@ Provide:
                         {"role": "user", "content": log_info}
                     ],
                     temperature=0.5,
-                    max_tokens=800
+                    max_tokens=1500,
+                    stream=False
                 )
-                return response.choices[0].message.content
+                ai_response = response.choices[0].message.content
+                
+                # Remove <think>...</think> tags and their content
+                import re
+                ai_response = re.sub(r'<think>.*?</think>', '', ai_response, flags=re.DOTALL)
+                ai_response = ai_response.strip()
+                
+                # Append XAI and blockchain sections
+                full_response = ai_response + xai_section + blockchain_section
+                
+                logger.info("✓ Groq AI log analysis completed")
+                return full_response
             except Exception as e:
-                logger.error(f"Groq API error during log analysis: {e}")
+                logger.error(f"❌ Groq API error during log analysis: {e}")
         
-        # Fallback to pattern-based analysis
-        return self.analyze_log(log_data)
+        # Only fallback if AI failed - still include XAI and blockchain
+        logger.warning("⚠️ Using fallback log analysis (AI unavailable)")
+        fallback = self.analyze_log(log_data)
+        return fallback + xai_section + blockchain_section
     
     def _fallback_response(self, message: str) -> str:
         """Pattern-based fallback responses"""

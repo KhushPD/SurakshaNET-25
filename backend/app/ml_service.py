@@ -75,6 +75,20 @@ class MLService:
             if "xgb_binary" in self.models and "xgb_multiclass" in self.models:
                 self.models_loaded = True
                 logger.info("ML models loaded successfully!")
+                
+                # Initialize XAI explainer
+                try:
+                    from reporting.blockchain_service import ExplainableIDS
+                    import reporting.blockchain_service as bc_module
+                    
+                    if self.feature_names and "rf_binary" in self.models:
+                        bc_module.xai_explainer = ExplainableIDS(
+                            self.models["rf_binary"],
+                            self.feature_names
+                        )
+                        logger.info("✓ XAI Explainer initialized")
+                except Exception as e:
+                    logger.warning(f"XAI Explainer initialization failed: {e}")
             else:
                 logger.error("Failed to load required models")
                 

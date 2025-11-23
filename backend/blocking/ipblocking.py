@@ -12,17 +12,38 @@ class IPBlockingService:
     def __init__(self):
         self.blocked_ips: Dict[str, Dict] = {}
         self.lock = threading.Lock()
+        self.recent_blocks: List[Dict] = []  # Store recent blocks for notifications
     
-    def block_ip(self, ip: str, reason: str, duration_minutes: int = 60) -> None:
+    def block_ip(self, ip: str, reason: str, duration_minutes: int = 60, confidence: float = None) -> None:
         """Block an IP address for specified duration"""
+        now = datetime.now()
         with self.lock:
             self.blocked_ips[ip] = {
-                "blocked_at": datetime.now(),
+                "blocked_at": now,
                 "reason": reason,
-                "expires": datetime.now() + timedelta(minutes=duration_minutes),
+                "expires": now + timedelta(minutes=duration_minutes),
                 "status": "blocked"
             }
+            # Add to recent blocks for notification
+            self.recent_blocks.append({
+                "ip": ip,
+                "reason": reason,
+                "timestamp": now.isoformat(),
+                "confidence": f"{confidence*100:.1f}%" if confidence else "Manual",
+                "id": f"{ip}_{int(now.timestamp())}"
+            })
+            # Keep only last 50 blocks
+            if len(self.recent_blocks) > 3:
+                self.recent_blocks.pop(0)
+        
         logger.warning(f"🚫 Blocked IP: {ip} | Reason: {reason} | Duration: {duration_minutes}m")
+        
+        # Send email alert
+        try:
+            from reporting.mail_alert import email_alert_service
+            email_alert_service.send_ip_block_alert(ip, reason, confidence)
+        except Exception as e:
+            logger.error(f"Failed to send email alert: {e}")
     
     def is_blocked(self, ip: str) -> bool:
         """Check if IP is currently blocked"""
@@ -59,6 +80,13 @@ class IPBlockingService:
                 else:
                     del self.blocked_ips[ip]
             return blocked
+    
+    def get_recent_blocks(self, since_timestamp: str = None) -> List[Dict]:
+        """Get recent IP blocks for notifications"""
+        with self.lock:
+            if since_timestamp:
+                return [block for block in self.recent_blocks if block["timestamp"] > since_timestamp]
+            return self.recent_blocks.copy()
 
 # Global instance
 ip_blocking_service = IPBlockingService()

@@ -519,8 +519,23 @@ class RealTimeMonitoringService:
             ip_blocking_service.block_ip(
                 ip=source_ip,
                 reason=f"{attack_type} attack detected (confidence: {confidence:.2%})",
-                duration_minutes=30
+                duration_minutes=30,
+                confidence=confidence
             )
+            
+            # Add to blockchain for immutable audit trail
+            try:
+                from reporting.blockchain_service import threat_blockchain
+                threat_blockchain.add_threat_block({
+                    'source_ip': source_ip,
+                    'destination_ip': dest_ip,
+                    'attack_type': attack_type,
+                    'confidence': float(confidence),
+                    'action_taken': 'BLOCKED_AT_FIREWALL',
+                    'timestamp': datetime.now().isoformat()
+                })
+            except Exception as e:
+                logger.error(f"Failed to add to blockchain: {e}")
     
     async def process_uploaded_data(self, df: pd.DataFrame):
         """

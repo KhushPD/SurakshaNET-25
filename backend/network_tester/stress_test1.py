@@ -61,40 +61,28 @@ def run_stress_test_1(dataset_path: str):
     Pattern: Normal (20s) → Attack Wave (20s) → Normal Recovery (20s)
     Total Duration: ~60 seconds
     """
-    print("\n" + "="*70)
-    print("🟢 STRESS TEST 1 - EASY")
-    print("Pattern: Normal → Attack Wave → Normal Recovery")
-    print("Duration: ~60 seconds")
-    print("="*70 + "\n")
-    
+    print("\n=== STRESS TEST 1 - EASY ===")
     header, normal_rows, attack_rows = load_dataset(dataset_path)
     batch_num = 0
-    
-    # Phase 1: Normal Traffic (20s)
-    print("📊 Phase 1: Normal Traffic (20s)")
-    for _ in range(4):
+    # Phase 1: Normal Traffic
+    for _ in range(2):
         batch_num += 1
-        sample = random.sample(normal_rows, min(30, len(normal_rows)))
+        sample = random.sample(normal_rows, min(10, len(normal_rows)))
         send_batch(header, sample, batch_num, "NORMAL")
-        time.sleep(5)
-    
-    # Phase 2: Attack Wave (20s)
-    print("\n🔴 Phase 2: Attack Wave (20s)")
-    for _ in range(4):
+        time.sleep(1)
+    # Phase 2: Attack Wave
+    for _ in range(2):
         batch_num += 1
-        sample = random.sample(attack_rows, min(40, len(attack_rows)))
+        sample = random.sample(attack_rows, min(15, len(attack_rows)))
         send_batch(header, sample, batch_num, "ATTACK")
-        time.sleep(5)
-    
-    # Phase 3: Normal Recovery (20s)
-    print("\n📊 Phase 3: Normal Recovery (20s)")
-    for _ in range(4):
+        time.sleep(1)
+    # Phase 3: Normal Recovery
+    for _ in range(2):
         batch_num += 1
-        sample = random.sample(normal_rows, min(30, len(normal_rows)))
+        sample = random.sample(normal_rows, min(10, len(normal_rows)))
         send_batch(header, sample, batch_num, "RECOVERY")
-        time.sleep(5)
-    
-    print("\n✅ Stress Test 1 Complete! (~60s)\n")
+        time.sleep(1)
+    print("\n✅ Stress Test 1 Complete!\n")
 
 
 if __name__ == "__main__":

@@ -586,7 +586,7 @@ async def get_blocked_ips():
 @app.post("/block-ip", tags=["Security"])
 async def block_ip_endpoint(ip: str, reason: str, duration_minutes: int = 60):
     """Manually block an IP address"""
-    ip_blocking_service.block_ip(ip, reason, duration_minutes)
+    ip_blocking_service.block_ip(ip, reason, duration_minutes, confidence=None)
     return {"status": "success", "message": f"IP {ip} blocked for {duration_minutes} minutes"}
 
 
@@ -597,6 +597,46 @@ async def unblock_ip_endpoint(ip: str):
     if success:
         return {"status": "success", "message": f"IP {ip} unblocked"}
     return {"status": "error", "message": f"IP {ip} not found in blocked list"}
+
+
+@app.get("/recent-blocks", tags=["Security"])
+async def get_recent_blocks(since: str = None):
+    """Get recent IP blocks for notifications"""
+    recent = ip_blocking_service.get_recent_blocks(since)
+    return {"status": "success", "blocks": recent}
+
+
+@app.get("/blockchain/verify", tags=["Security"])
+async def verify_blockchain():
+    """Verify blockchain integrity"""
+    try:
+        from reporting.blockchain_service import threat_blockchain
+        is_valid = threat_blockchain.verify_integrity()
+        return {
+            "status": "success",
+            "valid": is_valid,
+            "total_blocks": len(threat_blockchain.chain),
+            "message": "Blockchain integrity verified" if is_valid else "Blockchain tampering detected"
+        }
+    except Exception as e:
+        logger.error(f"Blockchain verification error: {e}")
+        return {"status": "error", "message": str(e)}
+
+
+@app.get("/blockchain/blocks", tags=["Security"])
+async def get_blockchain_blocks(limit: int = 10):
+    """Get recent blockchain blocks"""
+    try:
+        from reporting.blockchain_service import threat_blockchain
+        recent_blocks = threat_blockchain.chain[-limit:]
+        return {
+            "status": "success",
+            "blocks": recent_blocks,
+            "total": len(threat_blockchain.chain)
+        }
+    except Exception as e:
+        logger.error(f"Blockchain fetch error: {e}")
+        return {"status": "error", "message": str(e)}
 
 
 # Threat Intel Chatbot Endpoints
@@ -803,16 +843,20 @@ async def start_realtime_monitoring(use_simulation: bool = True):
         Status of monitoring service
     """
     try:
-        if realtime_service is None:
+        # Import module to access global variable
+        import app.realtime_service as rt_module
+        rt_service = rt_module.realtime_service
+        
+        if rt_service is None:
             raise HTTPException(status_code=500, detail="Real-time service not initialized")
         
-        if realtime_service.is_running:
+        if rt_service.is_running:
             return {
                 "status": "already_running",
                 "message": "Real-time monitoring is already active"
             }
         
-        await realtime_service.start_monitoring(use_simulation=use_simulation)
+        await rt_service.start_monitoring(use_simulation=use_simulation)
         
         logger.info("Real-time monitoring started successfully")
         return {
@@ -1039,10 +1083,14 @@ async def get_realtime_attack_types():
         Attack type statistics with labels
     """
     try:
-        if realtime_service is None:
+        # Import module to access global variable
+        import app.realtime_service as rt_module
+        rt_service = rt_module.realtime_service
+        
+        if rt_service is None:
             raise HTTPException(status_code=500, detail="Real-time service not initialized")
         
-        metrics = realtime_service.get_metrics()
+        metrics = rt_service.get_metrics()
         attack_counts = metrics["attack_type_counts_all"]
         
         # Format with labels
@@ -1077,15 +1125,20 @@ async def realtime_websocket(websocket):
     logger.info("WebSocket connection established")
     
     try:
+        # Import module to access global variable
+        import app.realtime_service as rt_module
+        
         while True:
-            if realtime_service is None:
+            rt_service = rt_module.realtime_service
+            
+            if rt_service is None:
                 await websocket.send_json({
                     "error": "Real-time service not initialized"
                 })
                 break
             
             # Get current metrics
-            metrics = realtime_service.get_metrics()
+            metrics = rt_service.get_metrics()
             
             # Send to client
             await websocket.send_json({

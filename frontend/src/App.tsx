@@ -31,6 +31,10 @@ function App() {
   const [chatbotContext, setChatbotContext] = useState<any>(null);
   const [chatbotMessage, setChatbotMessage] = useState<string>('');
 
+  // IP Block notification state
+  const [blockNotifications, setBlockNotifications] = useState<any[]>([]);
+  const [lastCheckTime, setLastCheckTime] = useState<string>(new Date().toISOString());
+
   // Theme state
   const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
     const saved = localStorage.getItem('theme');
@@ -47,6 +51,37 @@ function App() {
     //   });
     // }
   }, []);
+
+  // Poll for new IP blocks
+  useEffect(() => {
+    if (!isLoggedIn) return;
+
+    const checkForBlocks = async () => {
+      try {
+        const response = await fetch(`http://localhost:8000/recent-blocks?since=${lastCheckTime}`);
+        const data = await response.json();
+        
+        if (data.status === 'success' && data.blocks.length > 0) {
+          setBlockNotifications(prev => [...prev, ...data.blocks]);
+          setLastCheckTime(new Date().toISOString());
+          
+          // Auto-dismiss after 8 seconds
+          setTimeout(() => {
+            setBlockNotifications(prev => prev.filter(n => !data.blocks.some(b => b.id === n.id)));
+          }, 8000);
+        }
+      } catch (error) {
+        console.error('Error fetching blocks:', error);
+      }
+    };
+
+    const interval = setInterval(checkForBlocks, 3000); // Check every 3 seconds
+    return () => clearInterval(interval);
+  }, [isLoggedIn, lastCheckTime]);
+
+  const dismissNotification = (id: string) => {
+    setBlockNotifications(prev => prev.filter(n => n.id !== id));
+  };
 
   // Save theme preference
   useEffect(() => {
@@ -149,6 +184,40 @@ function App() {
           {renderContent()}
         </div>
       </main>
+
+      {/* IP Block Notifications */}
+      <div className="fixed bottom-4 right-4 z-50 space-y-2 max-w-sm">
+        {blockNotifications.map((block) => (
+          <div
+            key={block.id}
+            className={`p-4 rounded-lg shadow-2xl border backdrop-blur-md animate-slide-in ${
+              isDarkMode
+                ? 'bg-red-900/90 border-red-700 text-red-100'
+                : 'bg-red-50/90 border-red-300 text-red-900'
+            }`}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-lg">🚫</span>
+                  <h4 className="font-semibold text-sm">IP Blocked</h4>
+                </div>
+                <p className="text-xs font-mono mb-1">{block.ip}</p>
+                <p className="text-xs opacity-90">{block.reason}</p>
+                <p className="text-xs opacity-75 mt-1">Confidence: {block.confidence}</p>
+              </div>
+              <button
+                onClick={() => dismissNotification(block.id)}
+                className={`text-lg leading-none hover:opacity-70 transition-opacity ${
+                  isDarkMode ? 'text-red-300' : 'text-red-700'
+                }`}
+              >
+                ×
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
