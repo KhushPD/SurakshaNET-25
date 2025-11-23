@@ -50,10 +50,10 @@ def main():
     
     # Ask user for test selection
     print("Select Stress Test:")
-    print("1. Test 1 - Easy    (~60s)  Normal → Attack → Normal")
-    print("2. Test 2 - Medium  (~90s)  Normal → Mixed → Spike → Recovery")
-    print("3. Test 3 - Hard    (~120s) Escalating → Peak → Chaos → Recovery")
-    print("4. All Tests        (~270s) Run all tests sequentially")
+    print("1. Test 1 - Easy    (~3s)  Normal → Attack → Normal")
+    print("2. Test 2 - Medium  (~3s)  Normal → Mixed → Spike")
+    print("3. Test 3 - Hard    (~3s)  Normal → Escalating → Peak")
+    print("4. All Tests        (~10s) Run all tests sequentially")
     print("="*70)
     
     choice = input("\nEnter choice (1-4): ").strip()

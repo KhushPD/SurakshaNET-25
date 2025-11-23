@@ -19,15 +19,29 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin, isDarkMode, toggleTheme 
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState('');
+
+    // Simple credentials - In production, this should be handled by backend
+    const VALID_CREDENTIALS = {
+        username: 'admin',
+        password: 'admin123'
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        setError('');
         setIsLoading(true);
 
         // Simulating API delay
         setTimeout(() => {
             setIsLoading(false);
-            onLogin(username, password);
+            
+            // Validate credentials
+            if (username === VALID_CREDENTIALS.username && password === VALID_CREDENTIALS.password) {
+                onLogin(username, password);
+            } else {
+                setError('Invalid username or password. Please try again.');
+            }
         }, 800);
     };
 
@@ -154,6 +168,13 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin, isDarkMode, toggleTheme 
                                     required
                                 />
                             </div>
+
+                            {/* Error Message */}
+                            {error && (
+                                <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/30 animate-slide-up">
+                                    <p className="text-sm text-red-500 text-center">{error}</p>
+                                </div>
+                            )}
 
                             <button
                                 type="submit"

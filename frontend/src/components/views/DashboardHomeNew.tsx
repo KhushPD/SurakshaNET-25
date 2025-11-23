@@ -117,10 +117,12 @@ const DashboardHome: React.FC<DashboardHomeProps> = ({ isDarkMode }) => {
     }
 
     return (
-        <div className={`min-h-screen p-6 ${isDarkMode ? 'bg-gray-900 text-white' : 'bg-gray-50 text-gray-900'}`}>
+        <div className="min-h-screen p-6">
             {/* Header */}
             <div className="mb-8">
-                <h1 className="text-3xl font-bold mb-2">Real-Time Network Monitoring</h1>
+                <h1 className={`text-3xl font-bold mb-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                    Real-Time Network Monitoring
+                </h1>
                 <p className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>
                     Live threat detection and analysis
                 </p>
@@ -161,72 +163,96 @@ const DashboardHome: React.FC<DashboardHomeProps> = ({ isDarkMode }) => {
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     {/* Spider/Radar Plot */}
                     {plots.spider_plot && (
-                        <div className={`rounded-lg shadow-lg p-6 ${isDarkMode ? 'bg-gray-800' : 'bg-white'}`}>
-                            <h2 className="text-xl font-semibold mb-4">Threat Vector Analysis</h2>
+                        <div className={`rounded-xl shadow-lg p-6 backdrop-blur-xl border transition-all duration-300 hover:scale-[1.02] ${
+                            isDarkMode ? 'bg-gray-800/40 border-gray-700/50' : 'bg-white/80 border-gray-200/50'
+                        }`}>
+                            <h2 className={`text-xl font-semibold mb-4 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                                Threat Vector Analysis
+                            </h2>
                             <img
                                 src={plots.spider_plot}
                                 alt="Threat Vector Analysis"
-                                className="w-full h-auto"
+                                className="w-full h-auto rounded-lg"
                             />
                         </div>
                     )}
 
                     {/* Pie Chart */}
                     {plots.pie_chart && (
-                        <div className={`rounded-lg shadow-lg p-6 ${isDarkMode ? 'bg-gray-800' : 'bg-white'}`}>
-                            <h2 className="text-xl font-semibold mb-4">Traffic Distribution</h2>
+                        <div className={`rounded-xl shadow-lg p-6 backdrop-blur-xl border transition-all duration-300 hover:scale-[1.02] ${
+                            isDarkMode ? 'bg-gray-800/40 border-gray-700/50' : 'bg-white/80 border-gray-200/50'
+                        }`}>
+                            <h2 className={`text-xl font-semibold mb-4 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                                Traffic Distribution
+                            </h2>
                             <img
                                 src={plots.pie_chart}
                                 alt="Traffic Distribution"
-                                className="w-full h-auto"
+                                className="w-full h-auto rounded-lg"
                             />
                         </div>
                     )}
 
                     {/* Attack Type Distribution */}
                     {plots.attack_type_distribution && (
-                        <div className={`rounded-lg shadow-lg p-6 ${isDarkMode ? 'bg-gray-800' : 'bg-white'}`}>
-                            <h2 className="text-xl font-semibold mb-4">Attack Type Distribution</h2>
+                        <div className={`rounded-xl shadow-lg p-6 backdrop-blur-xl border transition-all duration-300 hover:scale-[1.02] ${
+                            isDarkMode ? 'bg-gray-800/40 border-gray-700/50' : 'bg-white/80 border-gray-200/50'
+                        }`}>
+                            <h2 className={`text-xl font-semibold mb-4 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                                Attack Type Distribution
+                            </h2>
                             <img
                                 src={plots.attack_type_distribution}
                                 alt="Attack Type Distribution"
-                                className="w-full h-auto"
+                                className="w-full h-auto rounded-lg"
                             />
                         </div>
                     )}
 
                     {/* Binary Classification */}
                     {plots.binary_classification && (
-                        <div className={`rounded-lg shadow-lg p-6 ${isDarkMode ? 'bg-gray-800' : 'bg-white'}`}>
-                            <h2 className="text-xl font-semibold mb-4">Binary Classification Metrics</h2>
+                        <div className={`rounded-xl shadow-lg p-6 backdrop-blur-xl border transition-all duration-300 hover:scale-[1.02] ${
+                            isDarkMode ? 'bg-gray-800/40 border-gray-700/50' : 'bg-white/80 border-gray-200/50'
+                        }`}>
+                            <h2 className={`text-xl font-semibold mb-4 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                                Binary Classification Metrics
+                            </h2>
                             <img
                                 src={plots.binary_classification}
                                 alt="Binary Classification Metrics"
-                                className="w-full h-auto"
+                                className="w-full h-auto rounded-lg"
                             />
                         </div>
                     )}
 
                     {/* Timeline */}
                     {plots.timeline && (
-                        <div className={`rounded-lg shadow-lg p-6 ${isDarkMode ? 'bg-gray-800' : 'bg-white'}`}>
-                            <h2 className="text-xl font-semibold mb-4">Detection Timeline</h2>
+                        <div className={`rounded-xl shadow-lg p-6 backdrop-blur-xl border transition-all duration-300 hover:scale-[1.02] ${
+                            isDarkMode ? 'bg-gray-800/40 border-gray-700/50' : 'bg-white/80 border-gray-200/50'
+                        }`}>
+                            <h2 className={`text-xl font-semibold mb-4 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                                Detection Timeline
+                            </h2>
                             <img
                                 src={plots.timeline}
                                 alt="Detection Timeline"
-                                className="w-full h-auto"
+                                className="w-full h-auto rounded-lg"
                             />
                         </div>
                     )}
 
                     {/* Prediction Confidence */}
                     {plots.prediction_confidence && (
-                        <div className={`rounded-lg shadow-lg p-6 ${isDarkMode ? 'bg-gray-800' : 'bg-white'}`}>
-                            <h2 className="text-xl font-semibold mb-4">Prediction Confidence</h2>
+                        <div className={`rounded-xl shadow-lg p-6 backdrop-blur-xl border transition-all duration-300 hover:scale-[1.02] ${
+                            isDarkMode ? 'bg-gray-800/40 border-gray-700/50' : 'bg-white/80 border-gray-200/50'
+                        }`}>
+                            <h2 className={`text-xl font-semibold mb-4 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                                Prediction Confidence
+                            </h2>
                             <img
                                 src={plots.prediction_confidence}
                                 alt="Prediction Confidence"
-                                className="w-full h-auto"
+                                className="w-full h-auto rounded-lg"
                             />
                         </div>
                     )}
@@ -294,7 +320,7 @@ const DashboardHome: React.FC<DashboardHomeProps> = ({ isDarkMode }) => {
                             return (
                                 <div
                                     key={attackType.id}
-                                    className={`rounded-lg border-2 p-4 ${getTypeColor(attackType.type)}`}
+                                    className={`rounded-xl border-2 p-4 backdrop-blur-xl transition-all duration-300 hover:scale-105 ${getTypeColor(attackType.type)}`}
                                 >
                                     <h3 className={`text-lg font-semibold mb-2 ${getTextColor(attackType.type)}`}>
                                         {attackType.type}

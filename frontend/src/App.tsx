@@ -14,6 +14,7 @@ import DashboardHome from './components/views/DashboardHomeNew';
 import DataLogsView from './components/views/DataLogsView';
 import ThreatIntelView from './components/views/ThreatIntelView';
 import ReportsView from './components/views/ReportsView';
+import FloatingLines from './components/common/FloatingLines';
 
 function App() {
   // Landing page state
@@ -44,15 +45,9 @@ function App() {
   // Check for existing session on mount
   useEffect(() => {
     // TODO: Check localStorage for token and validate with backend
-    // const token = localStorage.getItem('token');
-    // if (token) {
-    //   validateToken(token).then(isValid => {
-    //     if (isValid) setIsLoggedIn(true);
-    //   });
-    // }
   }, []);
 
-  // Poll for new IP blocks
+  // Poll for new IP blocks - LIMITED TO MAX 4 NOTIFICATIONS WITH AUTO-DISMISS
   useEffect(() => {
     if (!isLoggedIn) return;
 
@@ -62,13 +57,19 @@ function App() {
         const data = await response.json();
         
         if (data.status === 'success' && data.blocks.length > 0) {
-          setBlockNotifications(prev => [...prev, ...data.blocks]);
+          // Add new blocks to notifications (limit to 4 total)
+          setBlockNotifications(prev => {
+            const combined = [...data.blocks, ...prev];
+            return combined.slice(0, 4); // Keep only first 4 (most recent)
+          });
           setLastCheckTime(new Date().toISOString());
           
-          // Auto-dismiss after 8 seconds
-          setTimeout(() => {
-            setBlockNotifications(prev => prev.filter(n => !data.blocks.some(b => b.id === n.id)));
-          }, 8000);
+          // Auto-dismiss each new notification after 5 seconds
+          data.blocks.forEach((block: any) => {
+            setTimeout(() => {
+              setBlockNotifications(prev => prev.filter(n => n.id !== block.id));
+            }, 5000); // 5 seconds per notification
+          });
         }
       } catch (error) {
         console.error('Error fetching blocks:', error);
@@ -103,19 +104,15 @@ function App() {
     if (user && pass) {
       setUsername(user);
       setIsLoggedIn(true);
-      // TODO: Save token to localStorage
-      // localStorage.setItem('token', token);
     }
   };
 
   // Handle user logout
   const handleLogout = () => {
-    // TODO: Clear token from localStorage
-    // localStorage.removeItem('token');
     setIsLoggedIn(false);
     setUsername('');
     setActiveTab('dashboard');
-    setShowLanding(true); // Return to landing page
+    setShowLanding(true);
   };
 
   // Handle Ask AI button from DataLogs
@@ -165,27 +162,52 @@ function App() {
 
   // Show main dashboard if authenticated
   return (
-    <div className={`flex flex-col h-screen font-sans overflow-hidden transition-colors duration-300 ${isDarkMode
-      ? 'bg-gradient-to-br from-black via-gray-900 to-green-950 text-gray-200'
-      : 'bg-gradient-to-br from-gray-50 via-white to-green-50 text-gray-800'
+    <div className={`flex flex-col h-screen font-sans overflow-hidden transition-colors duration-300 relative ${isDarkMode
+      ? 'bg-black'
+      : 'bg-white'
       }`}>
-      <Navbar
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        username={username}
-        onLogout={handleLogout}
-        mobileMenuOpen={mobileMenuOpen}
-        setMobileMenuOpen={setMobileMenuOpen}
-        isDarkMode={isDarkMode}
-        toggleTheme={toggleTheme}
-      />
-      <main className="flex-1 overflow-y-auto">
-        <div className="max-w-7xl mx-auto">
-          {renderContent()}
-        </div>
-      </main>
+      {/* Animated Background */}
+      <div className="absolute inset-0 z-0">
+        <FloatingLines
+          linesGradient={
+            isDarkMode
+              ? ['#10b981', '#059669', '#047857', '#065f46']
+              : ['#34d399', '#10b981', '#059669', '#047857']
+          }
+          enabledWaves={['middle', 'bottom']}
+          lineCount={[8, 6]}
+          lineDistance={[3, 5]}
+          animationSpeed={0.8}
+          interactive={true}
+          bendRadius={4.0}
+          bendStrength={-0.3}
+          mouseDamping={0.08}
+          parallax={true}
+          parallaxStrength={0.15}
+          mixBlendMode="screen"
+        />
+      </div>
 
-      {/* IP Block Notifications */}
+      {/* Content */}
+      <div className="relative z-10 flex flex-col h-full">
+        <Navbar
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          username={username}
+          onLogout={handleLogout}
+          mobileMenuOpen={mobileMenuOpen}
+          setMobileMenuOpen={setMobileMenuOpen}
+          isDarkMode={isDarkMode}
+          toggleTheme={toggleTheme}
+        />
+        <main className="flex-1 overflow-y-auto">
+          <div className="max-w-7xl mx-auto">
+            {renderContent()}
+          </div>
+        </main>
+      </div>
+
+      {/* IP Block Notifications - MAX 4, AUTO-DISMISS */}
       <div className="fixed bottom-4 right-4 z-50 space-y-2 max-w-sm">
         {blockNotifications.map((block) => (
           <div

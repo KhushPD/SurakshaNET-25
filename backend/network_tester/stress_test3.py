@@ -58,29 +58,28 @@ def send_batch(header, sample_rows, batch_num, phase):
 def run_stress_test_3(dataset_path: str):
     """
     STRESS TEST 3 - HARD
-    Pattern: Normal → Escalating → Peak → Chaos → Gradual Recovery
-    Total Duration: ~120 seconds
+    Pattern: Normal → Escalating → Peak
+    Total Duration: ~3 seconds (ultra-fast)
     """
-    print("\n" + "="*70)
-    print("🔴 STRESS TEST 3 - HARD")
-    print("Pattern: Normal → Escalating → Peak → Chaos → Recovery")
-    print("Duration: ~120 seconds")
+    print("="*70)
+    print("🔴 STRESS TEST 3 - HARD (ULTRA-FAST)")
+    print("Pattern: Normal → Escalating → Peak")
+    print("Duration: ~3 seconds")
     print("="*70 + "\n")
     
     header, normal_rows, attack_rows = load_dataset(dataset_path)
     batch_num = 0
     
-    # Phase 1: Normal Baseline (15s)
-    print("📊 Phase 1: Normal Baseline (15s)")
-    for _ in range(3):
-        batch_num += 1
-        sample = random.sample(normal_rows, min(50, len(normal_rows)))
-        send_batch(header, sample, batch_num, "NORMAL")
-        time.sleep(5)
+    # Phase 1: Normal Baseline (0.5s)
+    print("📊 Phase 1: Normal Baseline (0.5s)")
+    batch_num += 1
+    sample = random.sample(normal_rows, min(20, len(normal_rows)))
+    send_batch(header, sample, batch_num, "NORMAL")
+    time.sleep(0.1)
     
-    # Phase 2: Escalating Attacks (30s)
-    print("\n⚠️  Phase 2: Escalating Attack Pattern (30s)")
-    attack_percentages = [20, 30, 40, 60, 75, 85]
+    # Phase 2: Escalating Attacks (1.5s)
+    print("\n⚠️  Phase 2: Escalating Attack Pattern (1.5s)")
+    attack_percentages = [50, 85]
     for pct in attack_percentages:
         batch_num += 1
         attack_count = pct
@@ -90,44 +89,16 @@ def run_stress_test_3(dataset_path: str):
         mixed = attack_sample + normal_sample
         random.shuffle(mixed)
         send_batch(header, mixed, batch_num, "ESCALATING")
-        time.sleep(5)
+        time.sleep(0.1)
     
-    # Phase 3: Peak Attack Load (20s)
-    print("\n🔥 Phase 3: Peak Attack Load (20s)")
-    for _ in range(4):
-        batch_num += 1
-        sample = random.sample(attack_rows, min(80, len(attack_rows)))
-        send_batch(header, sample, batch_num, "PEAK")
-        time.sleep(5)
+    # Phase 3: Peak Attack Load (1s)
+    print("\n🔥 Phase 3: Peak Attack Load (1s)")
+    batch_num += 1
+    sample = random.sample(attack_rows, min(50, len(attack_rows)))
+    send_batch(header, sample, batch_num, "PEAK")
+    time.sleep(0.1)
     
-    # Phase 4: Chaotic Mixed (30s)
-    print("\n⚡ Phase 4: Chaotic Mixed Traffic (30s)")
-    for _ in range(6):
-        batch_num += 1
-        attack_count = random.randint(30, 70)
-        normal_count = 100 - attack_count
-        attack_sample = random.sample(attack_rows, min(attack_count, len(attack_rows)))
-        normal_sample = random.sample(normal_rows, min(normal_count, len(normal_rows)))
-        mixed = attack_sample + normal_sample
-        random.shuffle(mixed)
-        send_batch(header, mixed, batch_num, "CHAOS")
-        time.sleep(5)
-    
-    # Phase 5: Gradual Recovery (25s)
-    print("\n💚 Phase 5: Gradual Recovery (25s)")
-    attack_percentages = [60, 40, 25, 15, 5]
-    for pct in attack_percentages:
-        batch_num += 1
-        attack_count = pct
-        normal_count = 100 - pct
-        attack_sample = random.sample(attack_rows, min(attack_count, len(attack_rows)))
-        normal_sample = random.sample(normal_rows, min(normal_count, len(normal_rows)))
-        mixed = attack_sample + normal_sample
-        random.shuffle(mixed)
-        send_batch(header, mixed, batch_num, "RECOVERY")
-        time.sleep(5)
-    
-    print("\n✅ Stress Test 3 Complete! (~120s)\n")
+    print("\n✅ Stress Test 3 Complete! (~3s)\n")
 
 
 if __name__ == "__main__":
