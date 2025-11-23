@@ -27,6 +27,10 @@ function App() {
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
 
+  // Chatbot context state
+  const [chatbotContext, setChatbotContext] = useState<any>(null);
+  const [chatbotMessage, setChatbotMessage] = useState<string>('');
+
   // Theme state
   const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
     const saved = localStorage.getItem('theme');
@@ -79,15 +83,34 @@ function App() {
     setShowLanding(true); // Return to landing page
   };
 
+  // Handle Ask AI button from DataLogs
+  const handleAskAI = (log: any) => {
+    setChatbotMessage('Analyze this log entry');
+    setChatbotContext({ log_data: log });
+    setActiveTab('threatintel');
+  };
+
+  // Clear context when switching away from threatintel
+  useEffect(() => {
+    if (activeTab !== 'threatintel') {
+      setChatbotMessage('');
+      setChatbotContext(null);
+    }
+  }, [activeTab]);
+
   // Render appropriate view based on active tab
   const renderContent = () => {
     switch (activeTab) {
       case 'dashboard':
         return <DashboardHome isDarkMode={isDarkMode} />;
       case 'datalogs':
-        return <DataLogsView isDarkMode={isDarkMode} />;
+        return <DataLogsView isDarkMode={isDarkMode} onAskAI={handleAskAI} />;
       case 'threatintel':
-        return <ThreatIntelView isDarkMode={isDarkMode} />;
+        return <ThreatIntelView 
+          isDarkMode={isDarkMode} 
+          initialMessage={chatbotMessage}
+          initialContext={chatbotContext}
+        />;
       case 'reports':
         return <ReportsView isDarkMode={isDarkMode} />;
       default:

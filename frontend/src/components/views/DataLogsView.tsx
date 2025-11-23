@@ -4,11 +4,12 @@
  * View for accessing historical traffic data logs.
  */
 
-import { Database, Play, RefreshCw, Trash2, Activity } from 'lucide-react';
+import { Database, Play, RefreshCw, Trash2, Activity, Sparkles } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
 interface DataLogsViewProps {
     isDarkMode: boolean;
+    onAskAI?: (log: NetworkLog) => void;
 }
 
 interface NetworkLog {
@@ -31,7 +32,7 @@ interface NetworkStats {
     intrusion_rate: number;
 }
 
-const DataLogsView: React.FC<DataLogsViewProps> = ({ isDarkMode }) => {
+const DataLogsView: React.FC<DataLogsViewProps> = ({ isDarkMode, onAskAI }) => {
     const [logs, setLogs] = useState<NetworkLog[]>([]);
     const [stats, setStats] = useState<NetworkStats | null>(null);
     const [isLoading, setIsLoading] = useState(false);
@@ -236,12 +237,13 @@ const DataLogsView: React.FC<DataLogsViewProps> = ({ isDarkMode }) => {
                                 <th className="px-4 py-3 text-left text-sm font-semibold">Status</th>
                                 <th className="px-4 py-3 text-left text-sm font-semibold">Type</th>
                                 <th className="px-4 py-3 text-left text-sm font-semibold">Details</th>
+                                <th className="px-4 py-3 text-left text-sm font-semibold">Action</th>
                             </tr>
                         </thead>
                         <tbody>
                             {logs.length === 0 ? (
                                 <tr>
-                                    <td colSpan={6} className="px-4 py-8 text-center opacity-50">
+                                    <td colSpan={7} className="px-4 py-8 text-center opacity-50">
                                         No logs available. Run a test to generate traffic.
                                     </td>
                                 </tr>
@@ -276,6 +278,20 @@ const DataLogsView: React.FC<DataLogsViewProps> = ({ isDarkMode }) => {
                                                 : log.response_code
                                                 ? `HTTP ${log.response_code}`
                                                 : '-'}
+                                        </td>
+                                        <td className="px-4 py-3">
+                                            <button
+                                                onClick={() => onAskAI?.(log)}
+                                                className={`flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
+                                                    isDarkMode
+                                                        ? 'bg-green-600 hover:bg-green-500 text-white'
+                                                        : 'bg-green-700 hover:bg-green-600 text-white'
+                                                }`}
+                                                title="Analyze with AI"
+                                            >
+                                                <Sparkles className="w-3 h-3" />
+                                                Ask AI
+                                            </button>
                                         </td>
                                     </tr>
                                 ))

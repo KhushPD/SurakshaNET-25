@@ -599,6 +599,24 @@ async def unblock_ip_endpoint(ip: str):
     return {"status": "error", "message": f"IP {ip} not found in blocked list"}
 
 
+# Threat Intel Chatbot Endpoints
+@app.post("/chatbot/message", tags=["Chatbot"])
+async def chatbot_message(request: dict):
+    """Send message to threat intelligence chatbot"""
+    try:
+        sys.path.insert(0, str(Path(__file__).parent.parent))
+        from chatbot.llm import threat_intel_bot
+        
+        message = request.get('message', '')
+        context = request.get('context', None)
+        
+        response = threat_intel_bot.chat(message, context)
+        return {"response": response, "status": "success"}
+    except Exception as e:
+        logger.error(f"Chatbot error: {e}")
+        return {"response": "I'm having trouble processing that request. Please try again.", "status": "error"}
+
+
 if __name__ == "__main__":
     import uvicorn
     

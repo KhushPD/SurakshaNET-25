@@ -11,3 +11,6 @@ joblib>=1.4.2
 imbalanced-learn>=0.12.3
 python-multipart>=0.0.9
 pydantic>=2.9.2
+groq>=0.4.0
+python-dotenv>=1.0.0
+requests>=2.31.0

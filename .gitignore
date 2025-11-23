@@ -2,3 +2,8 @@
 dataset/
 *.csv
 *.parquet
+
+# Environment variables
+.env
+backend/.env
+*.env.local
