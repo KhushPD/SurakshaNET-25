@@ -928,7 +928,9 @@ async def get_realtime_visualizations():
             "plots": plots,
             "metrics_summary": {
                 "total_processed": metrics["total_processed"],
-                "attack_rate": metrics["attack_rate_percent"],
+                "total_attacks": metrics["total_attacks"],
+                "total_normal": metrics["total_normal"],
+                "attack_rate_percent": metrics["attack_rate_percent"],
                 "last_update": metrics["last_update"]
             }
         }
