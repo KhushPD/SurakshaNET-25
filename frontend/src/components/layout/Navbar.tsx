@@ -6,7 +6,6 @@
  */
 
 import {
-    Shield,
     Activity,
     Database,
     Radar as RadarIcon,
@@ -65,7 +64,7 @@ const Navbar: React.FC<NavbarProps> = ({
 
                     {/* Logo Section */}
                     <div className="flex items-center flex-shrink-0">
-                        <Shield className="w-8 h-8 text-green-300" />
+                        <img src="/logo.png" alt="SurakshaNET Logo" className="w-8 h-8" />
                         <span className="ml-2 text-xl font-bold">SurakshaNET</span>
                     </div>
 

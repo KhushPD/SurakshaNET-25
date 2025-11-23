@@ -5,7 +5,7 @@
  * Features FloatingLines Three.js animation and hero section.
  */
 
-import { Shield, ArrowRight, Moon, Sun } from 'lucide-react';
+import { ArrowRight, Moon, Sun } from 'lucide-react';
 import FloatingLines from '../common/FloatingLines';
 
 interface LandingPageProps {
@@ -69,8 +69,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, isDarkMode, tog
                             ? 'bg-green-500/10 border-2 border-green-500/30 shadow-lg shadow-green-500/20'
                             : 'bg-green-100/80 border-2 border-green-300/50 shadow-lg shadow-green-200/50'
                             }`}>
-                            <Shield className={`w-16 h-16 ${isDarkMode ? 'text-green-400' : 'text-green-700'
-                                }`} />
+                            <img src="/logo.png" alt="SurakshaNET Logo" className="w-16 h-16" />
                         </div>
                     </div>
 
